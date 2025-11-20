@@ -174,6 +174,21 @@ function App() {
       return;
     }
 
+    // Confirmation dialogs
+    let confirmMessage = '';
+    if (isPredicting) {
+      confirmMessage = `Save your predictions as ${playerName}?\n\nYour predicted winner: ${bracket['5-0']}\n\nYou can't change these after saving!`;
+    } else if (isEditing && tournamentDocId) {
+      confirmMessage = `Update your master bracket?\n\nNew winning name: ${bracket['5-0']}\n\nThis will replace your previous choices!`;
+    } else {
+      confirmMessage = `Save your master bracket?\n\nWinning name: ${bracket['5-0']}\n\nYou can edit this later using the Game ID: ${gameId}`;
+    }
+
+    const confirmed = window.confirm(confirmMessage);
+    if (!confirmed) {
+      return; // User cancelled
+    }
+
     try {
       if (isPredicting) {
         // Save friend's prediction
@@ -233,8 +248,40 @@ function App() {
   };
 
   const editBracket = () => {
-    setView('create-bracket');
+    const confirmed = window.confirm(
+      'Edit your master bracket?\n\nYou can change any of your picks. Changes will need to be saved.'
+    );
+    if (confirmed) {
+      setView('create-bracket');
+      setCurrentRound(1);
+    }
+  };
+
+  const hasUnsavedWork = () => {
+    return Object.keys(bracket).length > 0 || names.some(n => n.trim());
+  };
+
+  const goBackWithConfirmation = (targetView) => {
+    if (hasUnsavedWork() && (view === 'create-bracket' || view === 'enter-names')) {
+      const confirmed = window.confirm(
+        'You have unsaved work! Are you sure you want to go back?\n\nAll your current picks will be lost.'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    
+    // Reset everything
+    setNames(Array(32).fill(''));
+    setBracket({});
     setCurrentRound(1);
+    setIsEditing(false);
+    setIsPredicting(false);
+    setTournamentDocId('');
+    setLoadGameId('');
+    setJoinGameId('');
+    setPlayerName('');
+    setView(targetView);
   };
 
   return (
@@ -333,7 +380,7 @@ function App() {
             </div>
 
             <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button onClick={() => setView('home')} style={buttonStyle}>
+              <button onClick={() => goBackWithConfirmation('home')} style={buttonStyle}>
                 ← Back
               </button>
               <button onClick={startBracket} style={buttonStyle}>
@@ -383,7 +430,7 @@ function App() {
             ))}
 
             <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button onClick={() => setView('home')} style={buttonStyle}>
+              <button onClick={() => goBackWithConfirmation('home')} style={buttonStyle}>
                 ← Back to Home
               </button>
               <button onClick={editBracket} style={{...buttonStyle, backgroundColor: '#FF9800'}}>
@@ -445,6 +492,9 @@ function App() {
             </div>
 
             <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => goBackWithConfirmation('home')} style={{...buttonStyle, backgroundColor: '#d32f2f'}}>
+                ✕ Cancel
+              </button>
               {isEditing && (
                 <button onClick={() => setView('view-bracket')} style={buttonStyle}>
                   👁️ View Full Bracket
