@@ -7,10 +7,13 @@ function App() {
   const [view, setView] = useState('home');
   const [gameId, setGameId] = useState('');
   const [loadGameId, setLoadGameId] = useState('');
+  const [joinGameId, setJoinGameId] = useState('');
+  const [playerName, setPlayerName] = useState('');
   const [names, setNames] = useState(Array(32).fill(''));
   const [bracket, setBracket] = useState({});
   const [currentRound, setCurrentRound] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
+  const [isPredicting, setIsPredicting] = useState(false);
   const [tournamentDocId, setTournamentDocId] = useState('');
 
   const rounds = [
@@ -25,7 +28,45 @@ function App() {
     const newGameId = Math.random().toString(36).substring(2, 9).toUpperCase();
     setGameId(newGameId);
     setIsEditing(false);
+    setIsPredicting(false);
     setView('enter-names');
+  };
+
+  const joinTournament = async () => {
+    if (!joinGameId.trim()) {
+      alert('Please enter a Game ID');
+      return;
+    }
+
+    if (!playerName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+
+    try {
+      const q = query(collection(db, 'games'), where('gameId', '==', joinGameId.toUpperCase()));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        alert('Tournament not found! Check your Game ID.');
+        return;
+      }
+
+      const tournamentDoc = querySnapshot.docs[0];
+      const data = tournamentDoc.data();
+      
+      setGameId(data.gameId);
+      setNames(data.names);
+      setBracket({});  // Start with empty bracket for predictions
+      setIsPredicting(true);
+      setIsEditing(false);
+      setCurrentRound(1);
+      setView('create-bracket');
+      
+    } catch (error) {
+      console.error('Error loading tournament:', error);
+      alert('Error loading tournament!');
+    }
   };
 
   const loadTournament = async () => {
@@ -51,6 +92,7 @@ function App() {
       setBracket(data.bracket);
       setTournamentDocId(tournamentDoc.id);
       setIsEditing(true);
+      setIsPredicting(false);
       setCurrentRound(1);
       setView('view-bracket');
       
@@ -133,8 +175,21 @@ function App() {
     }
 
     try {
-      if (isEditing && tournamentDocId) {
-        // Update existing tournament
+      if (isPredicting) {
+        // Save friend's prediction
+        await addDoc(collection(db, 'predictions'), {
+          gameId: gameId,
+          playerName: playerName,
+          bracket: bracket,
+          predictedWinner: bracket['5-0'],
+          createdAt: new Date().toISOString()
+        });
+        
+        const winner = bracket['5-0'];
+        alert(`Predictions saved! Game ID: ${gameId}\nYour predicted winner: ${winner}\n\nPlayer: ${playerName}`);
+        
+      } else if (isEditing && tournamentDocId) {
+        // Update existing tournament (parent editing)
         const docRef = doc(db, 'games', tournamentDocId);
         await updateDoc(docRef, {
           names: names,
@@ -144,8 +199,9 @@ function App() {
         
         const winner = bracket['5-0'];
         alert(`Tournament updated! Game ID: ${gameId}\nWinning name: ${winner}`);
+        
       } else {
-        // Create new tournament
+        // Create new tournament (parents creating)
         await addDoc(collection(db, 'games'), {
           gameId: gameId,
           names: names,
@@ -154,7 +210,7 @@ function App() {
         });
         
         const winner = bracket['5-0'];
-        alert(`Tournament saved! Game ID: ${gameId}\nWinning name: ${winner}\n\nSave this ID to edit later!`);
+        alert(`Tournament saved! Game ID: ${gameId}\nWinning name: ${winner}\n\nSave this ID to edit later or share with friends!`);
       }
       
       setView('home');
@@ -164,11 +220,15 @@ function App() {
       setBracket({});
       setCurrentRound(1);
       setIsEditing(false);
+      setIsPredicting(false);
       setTournamentDocId('');
       setLoadGameId('');
+      setJoinGameId('');
+      setPlayerName('');
+      
     } catch (error) {
       console.error('Error:', error);
-      alert('Error saving tournament!');
+      alert('Error saving!');
     }
   };
 
@@ -188,17 +248,51 @@ function App() {
             <h1>Baby Name Bracket</h1>
             <p>The Ultimate Name Reveal Game</p>
             
-            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px' }}>
+            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '320px' }}>
+              {/* Create New Tournament */}
               <button onClick={createTournament} style={buttonStyle}>
                 ➕ Create New Tournament
               </button>
               
-              <button onClick={() => alert('Coming soon!')} style={buttonStyle}>
-                👥 Join & Make Predictions
-              </button>
+              {/* Join & Make Predictions */}
+              <div style={{ 
+                padding: '20px', 
+                background: '#2d2d2d', 
+                borderRadius: '10px',
+                border: '2px solid #764abc'
+              }}>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
+                  👥 Join & Make Predictions
+                </p>
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Your Name"
+                  style={{...inputStyle, width: '100%', marginBottom: '10px'}}
+                />
+                <input
+                  type="text"
+                  value={joinGameId}
+                  onChange={(e) => setJoinGameId(e.target.value)}
+                  placeholder="Enter Game ID"
+                  style={{...inputStyle, width: '100%', marginBottom: '10px'}}
+                />
+                <button onClick={joinTournament} style={{...buttonStyle, width: '100%'}}>
+                  Join Tournament
+                </button>
+              </div>
               
-              <div style={{ marginTop: '1rem' }}>
-                <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px' }}>Continue as Parents:</p>
+              {/* Continue as Parents */}
+              <div style={{ 
+                padding: '20px', 
+                background: '#2d2d2d', 
+                borderRadius: '10px',
+                border: '2px solid #FF9800'
+              }}>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
+                  👑 Continue as Parents
+                </p>
                 <input
                   type="text"
                   value={loadGameId}
@@ -206,8 +300,8 @@ function App() {
                   placeholder="Enter Game ID"
                   style={{...inputStyle, width: '100%', marginBottom: '10px'}}
                 />
-                <button onClick={loadTournament} style={buttonStyle}>
-                  👑 Load My Tournament
+                <button onClick={loadTournament} style={{...buttonStyle, width: '100%', backgroundColor: '#FF9800'}}>
+                  Load My Tournament
                 </button>
               </div>
             </div>
@@ -218,6 +312,7 @@ function App() {
           <div style={{ maxWidth: '1000px', width: '100%', padding: '20px' }}>
             <h2>Enter 32 Baby Names</h2>
             <p style={{ color: '#888' }}>Game ID: {gameId}</p>
+            <p style={{ color: '#4CAF50', fontSize: '14px' }}>💡 Share this Game ID with friends so they can make predictions!</p>
             
             <div style={{ 
               display: 'grid', 
@@ -302,8 +397,13 @@ function App() {
           <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
             <h2>{rounds[currentRound - 1].name}</h2>
             <p style={{ color: '#888' }}>
-              {isEditing ? 'Editing your bracket' : 'Pick your winners for this round'}
+              {isPredicting ? `Making predictions as: ${playerName}` : isEditing ? 'Editing your bracket' : 'Pick your winners for this round'}
             </p>
+            {isPredicting && (
+              <p style={{ color: '#4CAF50', fontSize: '14px' }}>
+                🎯 Pick who you think the parents will choose!
+              </p>
+            )}
             
             <div style={{ marginTop: '20px' }}>
               {Array.from({ length: rounds[currentRound - 1].games }).map((_, gameIdx) => {
@@ -362,7 +462,7 @@ function App() {
               )}
               {currentRound === 5 && canAdvance() && (
                 <button onClick={saveBracket} style={{...buttonStyle, backgroundColor: '#4CAF50'}}>
-                  {isEditing ? '💾 Update Tournament' : '💾 Save Tournament'}
+                  {isPredicting ? '💾 Save My Predictions' : isEditing ? '💾 Update Tournament' : '💾 Save Tournament'}
                 </button>
               )}
             </div>
