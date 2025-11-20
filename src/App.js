@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { db } from './firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import './App.css';
 
 function App() {
   const [view, setView] = useState('home');
   const [gameId, setGameId] = useState('');
+  const [loadGameId, setLoadGameId] = useState('');
   const [names, setNames] = useState(Array(32).fill(''));
   const [bracket, setBracket] = useState({});
   const [currentRound, setCurrentRound] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [tournamentDocId, setTournamentDocId] = useState('');
 
   const rounds = [
     { num: 1, name: 'Round of 32', games: 16 },
@@ -21,7 +24,40 @@ function App() {
   const createTournament = () => {
     const newGameId = Math.random().toString(36).substring(2, 9).toUpperCase();
     setGameId(newGameId);
+    setIsEditing(false);
     setView('enter-names');
+  };
+
+  const loadTournament = async () => {
+    if (!loadGameId.trim()) {
+      alert('Please enter a Game ID');
+      return;
+    }
+
+    try {
+      const q = query(collection(db, 'games'), where('gameId', '==', loadGameId.toUpperCase()));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        alert('Tournament not found! Check your Game ID.');
+        return;
+      }
+
+      const tournamentDoc = querySnapshot.docs[0];
+      const data = tournamentDoc.data();
+      
+      setGameId(data.gameId);
+      setNames(data.names);
+      setBracket(data.bracket);
+      setTournamentDocId(tournamentDoc.id);
+      setIsEditing(true);
+      setCurrentRound(1);
+      setView('view-bracket');
+      
+    } catch (error) {
+      console.error('Error loading tournament:', error);
+      alert('Error loading tournament!');
+    }
   };
 
   const handleNameChange = (index, value) => {
@@ -61,6 +97,18 @@ function App() {
   const selectWinner = (round, game, winner) => {
     const newBracket = { ...bracket };
     newBracket[`${round}-${game}`] = winner;
+    
+    // Clear any future rounds that depended on this matchup
+    for (let r = round + 1; r <= 5; r++) {
+      const gamesInNextRound = rounds[r - 1].games;
+      for (let g = 0; g < gamesInNextRound; g++) {
+        const key = `${r}-${g}`;
+        if (bracket[key]) {
+          delete newBracket[key];
+        }
+      }
+    }
+    
     setBracket(newBracket);
   };
 
@@ -85,25 +133,48 @@ function App() {
     }
 
     try {
-      await addDoc(collection(db, 'games'), {
-        gameId: gameId,
-        names: names,
-        bracket: bracket,
-        createdAt: new Date().toISOString()
-      });
+      if (isEditing && tournamentDocId) {
+        // Update existing tournament
+        const docRef = doc(db, 'games', tournamentDocId);
+        await updateDoc(docRef, {
+          names: names,
+          bracket: bracket,
+          updatedAt: new Date().toISOString()
+        });
+        
+        const winner = bracket['5-0'];
+        alert(`Tournament updated! Game ID: ${gameId}\nWinning name: ${winner}`);
+      } else {
+        // Create new tournament
+        await addDoc(collection(db, 'games'), {
+          gameId: gameId,
+          names: names,
+          bracket: bracket,
+          createdAt: new Date().toISOString()
+        });
+        
+        const winner = bracket['5-0'];
+        alert(`Tournament saved! Game ID: ${gameId}\nWinning name: ${winner}\n\nSave this ID to edit later!`);
+      }
       
-      const winner = bracket['5-0'];
-      alert(`Tournament saved! Game ID: ${gameId}\nWinning name: ${winner}`);
       setView('home');
       
       // Reset
       setNames(Array(32).fill(''));
       setBracket({});
       setCurrentRound(1);
+      setIsEditing(false);
+      setTournamentDocId('');
+      setLoadGameId('');
     } catch (error) {
       console.error('Error:', error);
       alert('Error saving tournament!');
     }
+  };
+
+  const editBracket = () => {
+    setView('create-bracket');
+    setCurrentRound(1);
   };
 
   return (
@@ -126,9 +197,19 @@ function App() {
                 👥 Join & Make Predictions
               </button>
               
-              <button onClick={() => alert('Coming soon!')} style={buttonStyle}>
-                👑 Continue as Parents
-              </button>
+              <div style={{ marginTop: '1rem' }}>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px' }}>Continue as Parents:</p>
+                <input
+                  type="text"
+                  value={loadGameId}
+                  onChange={(e) => setLoadGameId(e.target.value)}
+                  placeholder="Enter Game ID"
+                  style={{...inputStyle, width: '100%', marginBottom: '10px'}}
+                />
+                <button onClick={loadTournament} style={buttonStyle}>
+                  👑 Load My Tournament
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -167,10 +248,62 @@ function App() {
           </div>
         )}
 
+        {view === 'view-bracket' && (
+          <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
+            <h2>Your Master Bracket</h2>
+            <p style={{ color: '#888' }}>Game ID: {gameId}</p>
+            <p style={{ color: '#4CAF50', marginBottom: '20px' }}>Winner: {bracket['5-0'] || 'Not complete'}</p>
+            
+            {rounds.map((round) => (
+              <div key={round.num} style={{ marginBottom: '30px' }}>
+                <h3 style={{ color: '#764abc', marginBottom: '15px' }}>{round.name}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {Array.from({ length: round.games }).map((_, gameIdx) => {
+                    const [name1, name2] = getMatchup(round.num, gameIdx);
+                    const winner = bracket[`${round.num}-${gameIdx}`];
+                    
+                    if (!name1 || !name2) return null;
+
+                    return (
+                      <div key={gameIdx} style={{ 
+                        padding: '15px', 
+                        background: '#2d2d2d', 
+                        borderRadius: '10px',
+                        border: winner ? '2px solid #4CAF50' : '2px solid #444'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: winner === name1 ? '#4CAF50' : '#fff' }}>
+                            {winner === name1 && '👑 '}{name1}
+                          </span>
+                          <span style={{ color: '#888' }}>vs</span>
+                          <span style={{ color: winner === name2 ? '#4CAF50' : '#fff' }}>
+                            {winner === name2 && '👑 '}{name2}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button onClick={() => setView('home')} style={buttonStyle}>
+                ← Back to Home
+              </button>
+              <button onClick={editBracket} style={{...buttonStyle, backgroundColor: '#FF9800'}}>
+                ✏️ Edit Bracket
+              </button>
+            </div>
+          </div>
+        )}
+
         {view === 'create-bracket' && (
           <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
             <h2>{rounds[currentRound - 1].name}</h2>
-            <p style={{ color: '#888' }}>Pick your winners for this round</p>
+            <p style={{ color: '#888' }}>
+              {isEditing ? 'Editing your bracket' : 'Pick your winners for this round'}
+            </p>
             
             <div style={{ marginTop: '20px' }}>
               {Array.from({ length: rounds[currentRound - 1].games }).map((_, gameIdx) => {
@@ -211,7 +344,12 @@ function App() {
               })}
             </div>
 
-            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {isEditing && (
+                <button onClick={() => setView('view-bracket')} style={buttonStyle}>
+                  👁️ View Full Bracket
+                </button>
+              )}
               {currentRound > 1 && (
                 <button onClick={() => setCurrentRound(currentRound - 1)} style={buttonStyle}>
                   ← Previous Round
@@ -223,8 +361,8 @@ function App() {
                 </button>
               )}
               {currentRound === 5 && canAdvance() && (
-                <button onClick={saveBracket} style={buttonStyle}>
-                  Save Tournament! ✓
+                <button onClick={saveBracket} style={{...buttonStyle, backgroundColor: '#4CAF50'}}>
+                  {isEditing ? '💾 Update Tournament' : '💾 Save Tournament'}
                 </button>
               )}
             </div>
