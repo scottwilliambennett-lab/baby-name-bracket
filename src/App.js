@@ -394,7 +394,15 @@ function App() {
             <h1>Baby Name Bracket</h1>
             <p>The Ultimate Name Reveal Game</p>
             
-            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '320px' }}>
+            <div style={{ 
+              marginTop: '2rem', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '1.5rem', 
+              width: '100%',
+              maxWidth: '400px',
+              padding: '0 20px'
+            }}>
               {/* Create New Tournament */}
               <button onClick={createTournament} style={buttonStyle}>
                 ➕ Create New Tournament
@@ -478,38 +486,38 @@ function App() {
 
         {view === 'select-size' && (
           <div style={{ maxWidth: '600px', width: '100%', padding: '20px' }}>
-            <h2>Choose Bracket Size</h2>
-            <p style={{ color: '#888', marginBottom: '30px' }}>Game ID: {gameId}</p>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Choose Bracket Size</h2>
+            <p style={{ color: '#888', marginBottom: '30px', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <button 
                 onClick={() => selectBracketSize(8)} 
                 style={{...sizeButtonStyle}}
               >
-                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🎯</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>8 Names</div>
-                <div style={{ fontSize: '0.9rem', color: '#888' }}>Quick Game • 3 Rounds</div>
-                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Quarterfinals → Semifinals → Finals</div>
+                <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '10px' }}>🎯</div>
+                <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 'bold' }}>8 Names</div>
+                <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888' }}>Quick Game • 3 Rounds</div>
+                <div style={{ fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', color: '#aaa', marginTop: '5px' }}>Quarterfinals → Semifinals → Finals</div>
               </button>
 
               <button 
                 onClick={() => selectBracketSize(16)} 
                 style={{...sizeButtonStyle}}
               >
-                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🏀</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>16 Names</div>
-                <div style={{ fontSize: '0.9rem', color: '#888' }}>Standard Game • 4 Rounds</div>
-                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Round of 16 → Quarterfinals → Semifinals → Finals</div>
+                <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '10px' }}>🏀</div>
+                <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 'bold' }}>16 Names</div>
+                <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888' }}>Standard Game • 4 Rounds</div>
+                <div style={{ fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', color: '#aaa', marginTop: '5px' }}>Round of 16 → Quarterfinals → Semifinals → Finals</div>
               </button>
 
               <button 
                 onClick={() => selectBracketSize(32)} 
                 style={{...sizeButtonStyle}}
               >
-                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🏆</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>32 Names</div>
-                <div style={{ fontSize: '0.9rem', color: '#888' }}>Full Tournament • 5 Rounds</div>
-                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Round of 32 → Sweet 16 → Elite 8 → Final Four → Championship</div>
+                <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '10px' }}>🏆</div>
+                <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 'bold' }}>32 Names</div>
+                <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888' }}>Full Tournament • 5 Rounds</div>
+                <div style={{ fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', color: '#aaa', marginTop: '5px' }}>Round of 32 → Sweet 16 → Elite 8 → Final Four → Championship</div>
               </button>
             </div>
 
@@ -523,13 +531,13 @@ function App() {
 
         {view === 'enter-names' && (
           <div style={{ maxWidth: '1000px', width: '100%', padding: '20px' }}>
-            <h2>Enter {bracketSize} Baby Names</h2>
-            <p style={{ color: '#888' }}>Game ID: {gameId}</p>
-            <p style={{ color: '#4CAF50', fontSize: '14px' }}>💡 Share this Game ID with friends so they can make predictions!</p>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Enter {bracketSize} Baby Names</h2>
+            <p style={{ color: '#888', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
+            <p style={{ color: '#4CAF50', fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>💡 Share this Game ID with friends so they can make predictions!</p>
             
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))', 
               gap: '10px',
               marginTop: '20px'
             }}>
@@ -545,7 +553,7 @@ function App() {
               ))}
             </div>
 
-            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => goBackWithConfirmation('home')} style={buttonStyle}>
                 ← Back
               </button>
@@ -608,9 +616,9 @@ function App() {
 
         {view === 'scoreboard' && (
           <div style={{ maxWidth: '900px', width: '100%', padding: '20px' }}>
-            <h2>🏆 Leaderboard</h2>
-            <p style={{ color: '#888', marginBottom: '10px' }}>Game ID: {gameId} • {bracketSize} Names</p>
-            <p style={{ color: '#4CAF50', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>🏆 Leaderboard</h2>
+            <p style={{ color: '#888', marginBottom: '10px', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId} • {bracketSize} Names</p>
+            <p style={{ color: '#4CAF50', marginBottom: '30px', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>
               Winning Name: {masterBracket[`${maxRound}-0`] || 'Not revealed yet'}
             </p>
 
@@ -631,43 +639,48 @@ function App() {
                   .sort((a, b) => b.score - a.score)
                   .map((pred, idx) => (
                     <div key={pred.id} style={{
-                      padding: '20px',
+                      padding: '15px',
                       marginBottom: '15px',
                       background: idx === 0 ? '#FFD700' : '#2d2d2d',
                       borderRadius: '10px',
                       border: idx === 0 ? '3px solid #FFD700' : '2px solid #444',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: '1 1 auto' }}>
                         <div style={{ 
-                          fontSize: '2rem',
+                          fontSize: 'clamp(1.5rem, 5vw, 2rem)',
                           color: idx === 0 ? '#000' : '#fff'
                         }}>
                           {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                         </div>
-                        <div>
+                        <div style={{ flex: '1 1 auto', minWidth: '0' }}>
                           <div style={{ 
-                            fontSize: '1.2rem', 
+                            fontSize: 'clamp(1rem, 4vw, 1.2rem)', 
                             fontWeight: 'bold',
-                            color: idx === 0 ? '#000' : '#fff'
+                            color: idx === 0 ? '#000' : '#fff',
+                            wordBreak: 'break-word'
                           }}>
                             {pred.playerName}
                           </div>
                           <div style={{ 
-                            fontSize: '0.9rem', 
+                            fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', 
                             color: idx === 0 ? '#333' : '#888',
-                            marginTop: '5px'
+                            marginTop: '5px',
+                            wordBreak: 'break-word'
                           }}>
                             Predicted winner: {pred.predictedWinner}
                           </div>
                         </div>
                       </div>
                       <div style={{ 
-                        fontSize: '2rem', 
+                        fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
                         fontWeight: 'bold',
-                        color: idx === 0 ? '#000' : '#4CAF50'
+                        color: idx === 0 ? '#000' : '#4CAF50',
+                        whiteSpace: 'nowrap'
                       }}>
                         {pred.score} pts
                       </div>
@@ -708,12 +721,12 @@ function App() {
 
         {view === 'create-bracket' && (
           <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
-            <h2>{rounds[currentRound - 1].name}</h2>
-            <p style={{ color: '#888' }}>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>{rounds[currentRound - 1].name}</h2>
+            <p style={{ color: '#888', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>
               {isPredicting ? `Making predictions as: ${playerName}` : isEditing ? 'Editing your bracket' : 'Pick your winners for this round'}
             </p>
             {isPredicting && (
-              <p style={{ color: '#4CAF50', fontSize: '14px' }}>
+              <p style={{ color: '#4CAF50', fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
                 🎯 Pick who you think the parents will choose!
               </p>
             )}
@@ -791,18 +804,21 @@ function App() {
 
 const buttonStyle = {
   padding: '1rem 2rem',
-  fontSize: '1rem',
+  fontSize: 'clamp(0.9rem, 3vw, 1rem)',
   fontWeight: 'bold',
   border: 'none',
   borderRadius: '8px',
   cursor: 'pointer',
   backgroundColor: '#764abc',
   color: 'white',
-  transition: 'all 0.3s'
+  transition: 'all 0.3s',
+  minHeight: '48px', // Better touch target for mobile
+  width: '100%',
+  maxWidth: '300px'
 };
 
 const sizeButtonStyle = {
-  padding: '2rem',
+  padding: 'clamp(1rem, 4vw, 2rem)',
   fontSize: '1rem',
   border: '2px solid #444',
   borderRadius: '12px',
@@ -810,6 +826,7 @@ const sizeButtonStyle = {
   backgroundColor: '#2d2d2d',
   color: 'white',
   transition: 'all 0.3s',
+  minHeight: '48px',
   ':hover': {
     borderColor: '#764abc',
     transform: 'scale(1.02)'
@@ -817,23 +834,28 @@ const sizeButtonStyle = {
 };
 
 const inputStyle = {
-  padding: '10px',
-  fontSize: '14px',
+  padding: '12px',
+  fontSize: 'clamp(0.9rem, 3vw, 1rem)',
   border: '2px solid #444',
   borderRadius: '5px',
   backgroundColor: '#2d2d2d',
-  color: 'white'
+  color: 'white',
+  minHeight: '48px', // Better touch target
+  width: '100%'
 };
 
 const matchupButtonStyle = {
-  padding: '15px',
-  fontSize: '16px',
+  padding: 'clamp(12px, 3vw, 15px)',
+  fontSize: 'clamp(0.9rem, 3vw, 1rem)',
   fontWeight: 'bold',
   border: 'none',
   borderRadius: '8px',
   cursor: 'pointer',
   color: 'white',
-  transition: 'all 0.3s'
+  transition: 'all 0.3s',
+  minHeight: '48px', // Better touch target
+  wordBreak: 'break-word',
+  width: '100%'
 };
 
 export default App;
