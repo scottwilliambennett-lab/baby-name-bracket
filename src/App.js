@@ -8,28 +8,58 @@ function App() {
   const [gameId, setGameId] = useState('');
   const [loadGameId, setLoadGameId] = useState('');
   const [joinGameId, setJoinGameId] = useState('');
+  const [scoreboardGameId, setScoreboardGameId] = useState('');
   const [playerName, setPlayerName] = useState('');
+  const [bracketSize, setBracketSize] = useState(32);
   const [names, setNames] = useState(Array(32).fill(''));
   const [bracket, setBracket] = useState({});
   const [currentRound, setCurrentRound] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [isPredicting, setIsPredicting] = useState(false);
   const [tournamentDocId, setTournamentDocId] = useState('');
+  const [predictions, setPredictions] = useState([]);
+  const [masterBracket, setMasterBracket] = useState({});
 
-  const rounds = [
-    { num: 1, name: 'Round of 32', games: 16 },
-    { num: 2, name: 'Sweet 16', games: 8 },
-    { num: 3, name: 'Elite 8', games: 4 },
-    { num: 4, name: 'Final Four', games: 2 },
-    { num: 5, name: 'Championship', games: 1 }
-  ];
+  const getRoundsForSize = (size) => {
+    if (size === 8) {
+      return [
+        { num: 1, name: 'Quarterfinals', games: 4 },
+        { num: 2, name: 'Semifinals', games: 2 },
+        { num: 3, name: 'Finals', games: 1 }
+      ];
+    } else if (size === 16) {
+      return [
+        { num: 1, name: 'Round of 16', games: 8 },
+        { num: 2, name: 'Quarterfinals', games: 4 },
+        { num: 3, name: 'Semifinals', games: 2 },
+        { num: 4, name: 'Finals', games: 1 }
+      ];
+    } else {
+      return [
+        { num: 1, name: 'Round of 32', games: 16 },
+        { num: 2, name: 'Sweet 16', games: 8 },
+        { num: 3, name: 'Elite 8', games: 4 },
+        { num: 4, name: 'Final Four', games: 2 },
+        { num: 5, name: 'Championship', games: 1 }
+      ];
+    }
+  };
+
+  const rounds = getRoundsForSize(bracketSize);
+  const maxRound = rounds.length;
+
+  const selectBracketSize = (size) => {
+    setBracketSize(size);
+    setNames(Array(size).fill(''));
+    setView('enter-names');
+  };
 
   const createTournament = () => {
     const newGameId = Math.random().toString(36).substring(2, 9).toUpperCase();
     setGameId(newGameId);
     setIsEditing(false);
     setIsPredicting(false);
-    setView('enter-names');
+    setView('select-size');
   };
 
   const joinTournament = async () => {
@@ -57,7 +87,8 @@ function App() {
       
       setGameId(data.gameId);
       setNames(data.names);
-      setBracket({});  // Start with empty bracket for predictions
+      setBracketSize(data.bracketSize || data.names.length);
+      setBracket({});
       setIsPredicting(true);
       setIsEditing(false);
       setCurrentRound(1);
@@ -90,6 +121,7 @@ function App() {
       setGameId(data.gameId);
       setNames(data.names);
       setBracket(data.bracket);
+      setBracketSize(data.bracketSize || data.names.length);
       setTournamentDocId(tournamentDoc.id);
       setIsEditing(true);
       setIsPredicting(false);
@@ -102,6 +134,64 @@ function App() {
     }
   };
 
+  const loadScoreboard = async () => {
+    if (!scoreboardGameId.trim()) {
+      alert('Please enter a Game ID');
+      return;
+    }
+
+    try {
+      // Load master bracket
+      const gameQuery = query(collection(db, 'games'), where('gameId', '==', scoreboardGameId.toUpperCase()));
+      const gameSnapshot = await getDocs(gameQuery);
+      
+      if (gameSnapshot.empty) {
+        alert('Tournament not found! Check your Game ID.');
+        return;
+      }
+
+      const gameData = gameSnapshot.docs[0].data();
+      setMasterBracket(gameData.bracket);
+      setNames(gameData.names);
+      setBracketSize(gameData.bracketSize || gameData.names.length);
+      setGameId(gameData.gameId);
+
+      // Load all predictions
+      const predQuery = query(collection(db, 'predictions'), where('gameId', '==', scoreboardGameId.toUpperCase()));
+      const predSnapshot = await getDocs(predQuery);
+      
+      const allPredictions = predSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setPredictions(allPredictions);
+      setView('scoreboard');
+      
+    } catch (error) {
+      console.error('Error loading scoreboard:', error);
+      alert('Error loading scoreboard!');
+    }
+  };
+
+  const calculateScore = (predictionBracket, masterBracket) => {
+    let score = 0;
+    const rounds = getRoundsForSize(bracketSize);
+    
+    rounds.forEach((round, idx) => {
+      const pointsPerGame = idx + 1; // Round 1 = 1 point, Round 2 = 2 points, etc.
+      
+      for (let game = 0; game < round.games; game++) {
+        const key = `${round.num}-${game}`;
+        if (predictionBracket[key] && predictionBracket[key] === masterBracket[key]) {
+          score += pointsPerGame;
+        }
+      }
+    });
+    
+    return score;
+  };
+
   const handleNameChange = (index, value) => {
     const newNames = [...names];
     newNames[index] = value;
@@ -111,8 +201,8 @@ function App() {
   const startBracket = () => {
     const filledNames = names.filter(n => n.trim()).length;
     
-    if (filledNames !== 32) {
-      alert(`Please enter all 32 names! You have ${filledNames}/32`);
+    if (filledNames !== bracketSize) {
+      alert(`Please enter all ${bracketSize} names! You have ${filledNames}/${bracketSize}`);
       return;
     }
 
@@ -141,9 +231,11 @@ function App() {
     newBracket[`${round}-${game}`] = winner;
     
     // Clear any future rounds that depended on this matchup
-    for (let r = round + 1; r <= 5; r++) {
-      const gamesInNextRound = rounds[r - 1].games;
-      for (let g = 0; g < gamesInNextRound; g++) {
+    for (let r = round + 1; r <= maxRound; r++) {
+      const roundInfo = rounds.find(rd => rd.num === r);
+      if (!roundInfo) continue;
+      
+      for (let g = 0; g < roundInfo.games; g++) {
         const key = `${r}-${g}`;
         if (bracket[key]) {
           delete newBracket[key];
@@ -163,7 +255,7 @@ function App() {
   };
 
   const nextRound = () => {
-    if (currentRound < 5) {
+    if (currentRound < maxRound) {
       setCurrentRound(currentRound + 1);
     }
   };
@@ -174,19 +266,21 @@ function App() {
       return;
     }
 
+    const finalKey = `${maxRound}-0`;
+    
     // Confirmation dialogs
     let confirmMessage = '';
     if (isPredicting) {
-      confirmMessage = `Save your predictions as ${playerName}?\n\nYour predicted winner: ${bracket['5-0']}\n\nYou can't change these after saving!`;
+      confirmMessage = `Save your predictions as ${playerName}?\n\nYour predicted winner: ${bracket[finalKey]}\n\nYou can't change these after saving!`;
     } else if (isEditing && tournamentDocId) {
-      confirmMessage = `Update your master bracket?\n\nNew winning name: ${bracket['5-0']}\n\nThis will replace your previous choices!`;
+      confirmMessage = `Update your master bracket?\n\nNew winning name: ${bracket[finalKey]}\n\nThis will replace your previous choices!`;
     } else {
-      confirmMessage = `Save your master bracket?\n\nWinning name: ${bracket['5-0']}\n\nYou can edit this later using the Game ID: ${gameId}`;
+      confirmMessage = `Save your master bracket?\n\nWinning name: ${bracket[finalKey]}\n\nYou can edit this later using the Game ID: ${gameId}`;
     }
 
     const confirmed = window.confirm(confirmMessage);
     if (!confirmed) {
-      return; // User cancelled
+      return;
     }
 
     try {
@@ -196,35 +290,38 @@ function App() {
           gameId: gameId,
           playerName: playerName,
           bracket: bracket,
-          predictedWinner: bracket['5-0'],
+          predictedWinner: bracket[finalKey],
+          bracketSize: bracketSize,
           createdAt: new Date().toISOString()
         });
         
-        const winner = bracket['5-0'];
+        const winner = bracket[finalKey];
         alert(`Predictions saved! Game ID: ${gameId}\nYour predicted winner: ${winner}\n\nPlayer: ${playerName}`);
         
       } else if (isEditing && tournamentDocId) {
-        // Update existing tournament (parent editing)
+        // Update existing tournament
         const docRef = doc(db, 'games', tournamentDocId);
         await updateDoc(docRef, {
           names: names,
           bracket: bracket,
+          bracketSize: bracketSize,
           updatedAt: new Date().toISOString()
         });
         
-        const winner = bracket['5-0'];
+        const winner = bracket[finalKey];
         alert(`Tournament updated! Game ID: ${gameId}\nWinning name: ${winner}`);
         
       } else {
-        // Create new tournament (parents creating)
+        // Create new tournament
         await addDoc(collection(db, 'games'), {
           gameId: gameId,
           names: names,
           bracket: bracket,
+          bracketSize: bracketSize,
           createdAt: new Date().toISOString()
         });
         
-        const winner = bracket['5-0'];
+        const winner = bracket[finalKey];
         alert(`Tournament saved! Game ID: ${gameId}\nWinning name: ${winner}\n\nSave this ID to edit later or share with friends!`);
       }
       
@@ -240,6 +337,7 @@ function App() {
       setLoadGameId('');
       setJoinGameId('');
       setPlayerName('');
+      setBracketSize(32);
       
     } catch (error) {
       console.error('Error:', error);
@@ -281,6 +379,7 @@ function App() {
     setLoadGameId('');
     setJoinGameId('');
     setPlayerName('');
+    setBracketSize(32);
     setView(targetView);
   };
 
@@ -351,13 +450,80 @@ function App() {
                   Load My Tournament
                 </button>
               </div>
+
+              {/* View Scoreboard */}
+              <div style={{ 
+                padding: '20px', 
+                background: '#2d2d2d', 
+                borderRadius: '10px',
+                border: '2px solid #4CAF50'
+              }}>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
+                  📊 View Scoreboard
+                </p>
+                <input
+                  type="text"
+                  value={scoreboardGameId}
+                  onChange={(e) => setScoreboardGameId(e.target.value)}
+                  placeholder="Enter Game ID"
+                  style={{...inputStyle, width: '100%', marginBottom: '10px'}}
+                />
+                <button onClick={loadScoreboard} style={{...buttonStyle, width: '100%', backgroundColor: '#4CAF50'}}>
+                  View Leaderboard
+                </button>
+              </div>
             </div>
           </>
         )}
 
+        {view === 'select-size' && (
+          <div style={{ maxWidth: '600px', width: '100%', padding: '20px' }}>
+            <h2>Choose Bracket Size</h2>
+            <p style={{ color: '#888', marginBottom: '30px' }}>Game ID: {gameId}</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <button 
+                onClick={() => selectBracketSize(8)} 
+                style={{...sizeButtonStyle}}
+              >
+                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🎯</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>8 Names</div>
+                <div style={{ fontSize: '0.9rem', color: '#888' }}>Quick Game • 3 Rounds</div>
+                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Quarterfinals → Semifinals → Finals</div>
+              </button>
+
+              <button 
+                onClick={() => selectBracketSize(16)} 
+                style={{...sizeButtonStyle}}
+              >
+                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🏀</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>16 Names</div>
+                <div style={{ fontSize: '0.9rem', color: '#888' }}>Standard Game • 4 Rounds</div>
+                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Round of 16 → Quarterfinals → Semifinals → Finals</div>
+              </button>
+
+              <button 
+                onClick={() => selectBracketSize(32)} 
+                style={{...sizeButtonStyle}}
+              >
+                <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🏆</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>32 Names</div>
+                <div style={{ fontSize: '0.9rem', color: '#888' }}>Full Tournament • 5 Rounds</div>
+                <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>Round of 32 → Sweet 16 → Elite 8 → Final Four → Championship</div>
+              </button>
+            </div>
+
+            <div style={{ marginTop: '30px' }}>
+              <button onClick={() => setView('home')} style={buttonStyle}>
+                ← Back
+              </button>
+            </div>
+          </div>
+        )}
+
         {view === 'enter-names' && (
           <div style={{ maxWidth: '1000px', width: '100%', padding: '20px' }}>
-            <h2>Enter 32 Baby Names</h2>
+            <h2>Enter {bracketSize} Baby Names</h2>
             <p style={{ color: '#888' }}>Game ID: {gameId}</p>
             <p style={{ color: '#4CAF50', fontSize: '14px' }}>💡 Share this Game ID with friends so they can make predictions!</p>
             
@@ -393,8 +559,8 @@ function App() {
         {view === 'view-bracket' && (
           <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
             <h2>Your Master Bracket</h2>
-            <p style={{ color: '#888' }}>Game ID: {gameId}</p>
-            <p style={{ color: '#4CAF50', marginBottom: '20px' }}>Winner: {bracket['5-0'] || 'Not complete'}</p>
+            <p style={{ color: '#888' }}>Game ID: {gameId} • {bracketSize} Names</p>
+            <p style={{ color: '#4CAF50', marginBottom: '20px' }}>Winner: {bracket[`${maxRound}-0`] || 'Not complete'}</p>
             
             {rounds.map((round) => (
               <div key={round.num} style={{ marginBottom: '30px' }}>
@@ -435,6 +601,106 @@ function App() {
               </button>
               <button onClick={editBracket} style={{...buttonStyle, backgroundColor: '#FF9800'}}>
                 ✏️ Edit Bracket
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'scoreboard' && (
+          <div style={{ maxWidth: '900px', width: '100%', padding: '20px' }}>
+            <h2>🏆 Leaderboard</h2>
+            <p style={{ color: '#888', marginBottom: '10px' }}>Game ID: {gameId} • {bracketSize} Names</p>
+            <p style={{ color: '#4CAF50', marginBottom: '30px' }}>
+              Winning Name: {masterBracket[`${maxRound}-0`] || 'Not revealed yet'}
+            </p>
+
+            {predictions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                <p style={{ fontSize: '3rem' }}>🤷</p>
+                <p>No predictions yet!</p>
+                <p style={{ fontSize: '14px', marginTop: '10px' }}>Share the Game ID with friends so they can join.</p>
+              </div>
+            ) : (
+              <div>
+                <h3 style={{ color: '#764abc', marginBottom: '20px' }}>Standings</h3>
+                {predictions
+                  .map(pred => ({
+                    ...pred,
+                    score: calculateScore(pred.bracket, masterBracket)
+                  }))
+                  .sort((a, b) => b.score - a.score)
+                  .map((pred, idx) => (
+                    <div key={pred.id} style={{
+                      padding: '20px',
+                      marginBottom: '15px',
+                      background: idx === 0 ? '#FFD700' : '#2d2d2d',
+                      borderRadius: '10px',
+                      border: idx === 0 ? '3px solid #FFD700' : '2px solid #444',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ 
+                          fontSize: '2rem',
+                          color: idx === 0 ? '#000' : '#fff'
+                        }}>
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                        </div>
+                        <div>
+                          <div style={{ 
+                            fontSize: '1.2rem', 
+                            fontWeight: 'bold',
+                            color: idx === 0 ? '#000' : '#fff'
+                          }}>
+                            {pred.playerName}
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.9rem', 
+                            color: idx === 0 ? '#333' : '#888',
+                            marginTop: '5px'
+                          }}>
+                            Predicted winner: {pred.predictedWinner}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ 
+                        fontSize: '2rem', 
+                        fontWeight: 'bold',
+                        color: idx === 0 ? '#000' : '#4CAF50'
+                      }}>
+                        {pred.score} pts
+                      </div>
+                    </div>
+                  ))}
+
+                <div style={{ 
+                  marginTop: '30px', 
+                  padding: '20px', 
+                  background: '#1a1a1a', 
+                  borderRadius: '10px',
+                  border: '2px solid #444'
+                }}>
+                  <h4 style={{ color: '#764abc', marginBottom: '15px' }}>📋 Scoring System</h4>
+                  <div style={{ color: '#aaa', fontSize: '0.9rem' }}>
+                    {rounds.map((round, idx) => (
+                      <div key={round.num} style={{ marginBottom: '8px' }}>
+                        • {round.name}: <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>{idx + 1} point{idx === 0 ? '' : 's'}</span> per correct pick
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: '30px', textAlign: 'center' }}>
+              <button onClick={() => {
+                setView('home');
+                setPredictions([]);
+                setMasterBracket({});
+                setScoreboardGameId('');
+              }} style={buttonStyle}>
+                ← Back to Home
               </button>
             </div>
           </div>
@@ -505,12 +771,12 @@ function App() {
                   ← Previous Round
                 </button>
               )}
-              {currentRound < 5 && canAdvance() && (
+              {currentRound < maxRound && canAdvance() && (
                 <button onClick={nextRound} style={buttonStyle}>
                   Next Round →
                 </button>
               )}
-              {currentRound === 5 && canAdvance() && (
+              {currentRound === maxRound && canAdvance() && (
                 <button onClick={saveBracket} style={{...buttonStyle, backgroundColor: '#4CAF50'}}>
                   {isPredicting ? '💾 Save My Predictions' : isEditing ? '💾 Update Tournament' : '💾 Save Tournament'}
                 </button>
@@ -533,6 +799,21 @@ const buttonStyle = {
   backgroundColor: '#764abc',
   color: 'white',
   transition: 'all 0.3s'
+};
+
+const sizeButtonStyle = {
+  padding: '2rem',
+  fontSize: '1rem',
+  border: '2px solid #444',
+  borderRadius: '12px',
+  cursor: 'pointer',
+  backgroundColor: '#2d2d2d',
+  color: 'white',
+  transition: 'all 0.3s',
+  ':hover': {
+    borderColor: '#764abc',
+    transform: 'scale(1.02)'
+  }
 };
 
 const inputStyle = {
