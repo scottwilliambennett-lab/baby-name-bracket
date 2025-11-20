@@ -48,6 +48,14 @@ function App() {
   const rounds = getRoundsForSize(bracketSize);
   const maxRound = rounds.length;
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert(`Copied: ${text}`);
+    }).catch(() => {
+      alert('Could not copy. Please copy manually: ' + text);
+    });
+  };
+
   const selectBracketSize = (size) => {
     setBracketSize(size);
     setNames(Array(size).fill(''));
@@ -355,6 +363,31 @@ function App() {
     }
   };
 
+  const viewPredictions = async () => {
+    try {
+      const predQuery = query(collection(db, 'predictions'), where('gameId', '==', gameId));
+      const predSnapshot = await getDocs(predQuery);
+      
+      const allPredictions = predSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      if (allPredictions.length === 0) {
+        alert('No predictions yet! Share your Game ID with friends.');
+        return;
+      }
+
+      setPredictions(allPredictions);
+      setMasterBracket(bracket);
+      setView('view-predictions');
+      
+    } catch (error) {
+      console.error('Error loading predictions:', error);
+      alert('Error loading predictions!');
+    }
+  };
+
   const hasUnsavedWork = () => {
     return Object.keys(bracket).length > 0 || names.some(n => n.trim());
   };
@@ -487,7 +520,24 @@ function App() {
         {view === 'select-size' && (
           <div style={{ maxWidth: '600px', width: '100%', padding: '20px' }}>
             <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Choose Bracket Size</h2>
-            <p style={{ color: '#888', marginBottom: '30px', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '30px' }}>
+              <p style={{ color: '#888', margin: 0, fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
+              <button 
+                onClick={() => copyToClipboard(gameId)} 
+                style={{
+                  padding: '8px 15px',
+                  fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                  backgroundColor: '#4CAF50',
+                  border: 'none',
+                  borderRadius: '5px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                📋 Copy
+              </button>
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <button 
@@ -532,8 +582,26 @@ function App() {
         {view === 'enter-names' && (
           <div style={{ maxWidth: '1000px', width: '100%', padding: '20px' }}>
             <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Enter {bracketSize} Baby Names</h2>
-            <p style={{ color: '#888', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
-            <p style={{ color: '#4CAF50', fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>💡 Share this Game ID with friends so they can make predictions!</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <p style={{ color: '#888', margin: 0, fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId}</p>
+              <button 
+                onClick={() => copyToClipboard(gameId)} 
+                style={{
+                  padding: '8px 15px',
+                  fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                  backgroundColor: '#4CAF50',
+                  border: 'none',
+                  borderRadius: '5px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  minHeight: '36px'
+                }}
+              >
+                📋 Copy
+              </button>
+            </div>
+            <p style={{ color: '#4CAF50', fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', marginTop: '10px' }}>💡 Share this Game ID with friends so they can make predictions!</p>
             
             <div style={{ 
               display: 'grid', 
@@ -567,7 +635,25 @@ function App() {
         {view === 'view-bracket' && (
           <div style={{ maxWidth: '800px', width: '100%', padding: '20px' }}>
             <h2>Your Master Bracket</h2>
-            <p style={{ color: '#888' }}>Game ID: {gameId} • {bracketSize} Names</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <p style={{ color: '#888', margin: 0 }}>Game ID: {gameId} • {bracketSize} Names</p>
+              <button 
+                onClick={() => copyToClipboard(gameId)} 
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                  backgroundColor: '#4CAF50',
+                  border: 'none',
+                  borderRadius: '5px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  minHeight: '32px'
+                }}
+              >
+                📋 Copy
+              </button>
+            </div>
             <p style={{ color: '#4CAF50', marginBottom: '20px' }}>Winner: {bracket[`${maxRound}-0`] || 'Not complete'}</p>
             
             {rounds.map((round) => (
@@ -603,9 +689,12 @@ function App() {
               </div>
             ))}
 
-            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => goBackWithConfirmation('home')} style={buttonStyle}>
                 ← Back to Home
+              </button>
+              <button onClick={viewPredictions} style={{...buttonStyle, backgroundColor: '#2196F3'}}>
+                👁️ View All Predictions
               </button>
               <button onClick={editBracket} style={{...buttonStyle, backgroundColor: '#FF9800'}}>
                 ✏️ Edit Bracket
@@ -714,6 +803,102 @@ function App() {
                 setScoreboardGameId('');
               }} style={buttonStyle}>
                 ← Back to Home
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'view-predictions' && (
+          <div style={{ maxWidth: '900px', width: '100%', padding: '20px' }}>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>📊 All Predictions</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <p style={{ color: '#888', margin: 0, fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>Game ID: {gameId} • {predictions.length} predictions</p>
+            </div>
+            <p style={{ color: '#4CAF50', marginBottom: '30px', fontSize: 'clamp(0.9rem, 3vw, 1rem)' }}>
+              Your winning name: {masterBracket[`${maxRound}-0`] || 'Not complete'}
+            </p>
+
+            <div>
+              {predictions.map((pred, idx) => (
+                <div key={pred.id} style={{
+                  padding: '20px',
+                  marginBottom: '15px',
+                  background: '#2d2d2d',
+                  borderRadius: '10px',
+                  border: pred.predictedWinner === masterBracket[`${maxRound}-0`] ? '2px solid #4CAF50' : '2px solid #444'
+                }}>
+                  <div style={{ marginBottom: '15px' }}>
+                    <div style={{ 
+                      fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', 
+                      fontWeight: 'bold',
+                      color: '#fff',
+                      marginBottom: '5px'
+                    }}>
+                      {pred.playerName}
+                      {pred.predictedWinner === masterBracket[`${maxRound}-0`] && ' 🎯'}
+                    </div>
+                    <div style={{ 
+                      fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
+                      color: pred.predictedWinner === masterBracket[`${maxRound}-0`] ? '#4CAF50' : '#888'
+                    }}>
+                      Predicted winner: <strong>{pred.predictedWinner}</strong>
+                    </div>
+                  </div>
+
+                  {/* Show their complete bracket */}
+                  <div style={{ borderTop: '1px solid #444', paddingTop: '15px' }}>
+                    {rounds.map((round) => {
+                      const roundPicks = [];
+                      for (let g = 0; g < round.games; g++) {
+                        const key = `${round.num}-${g}`;
+                        if (pred.bracket[key]) {
+                          const isCorrect = pred.bracket[key] === masterBracket[key];
+                          roundPicks.push(
+                            <span key={key} style={{ 
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              margin: '4px',
+                              background: isCorrect ? '#2e7d32' : '#424242',
+                              borderRadius: '4px',
+                              fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                              color: isCorrect ? '#fff' : '#aaa'
+                            }}>
+                              {isCorrect && '✓ '}{pred.bracket[key]}
+                            </span>
+                          );
+                        }
+                      }
+                      
+                      if (roundPicks.length > 0) {
+                        return (
+                          <div key={round.num} style={{ marginBottom: '10px' }}>
+                            <div style={{ 
+                              fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', 
+                              color: '#764abc', 
+                              fontWeight: 'bold',
+                              marginBottom: '5px' 
+                            }}>
+                              {round.name}:
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                              {roundPicks}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '30px', textAlign: 'center' }}>
+              <button onClick={() => {
+                setView('view-bracket');
+                setPredictions([]);
+              }} style={buttonStyle}>
+                ← Back to Bracket
               </button>
             </div>
           </div>
