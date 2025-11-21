@@ -5,7 +5,8 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import './App.css';
 
@@ -29,6 +30,7 @@ function App() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [tournamentDocId, setTournamentDocId] = useState('');
   const [predictions, setPredictions] = useState([]);
+  const [predictionsCount, setPredictionsCount] = useState(0);
   const [masterBracket, setMasterBracket] = useState({});
 
   const getRoundsForSize = (size) => {
@@ -109,6 +111,28 @@ function App() {
       setGameId('');
     } catch (error) {
       alert('Error logging out');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const resetEmail = window.prompt('Enter your email address to reset password:');
+    
+    if (!resetEmail) return;
+    
+    if (!resetEmail.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      alert('✅ Password reset email sent!\n\nCheck your inbox and spam folder.');
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        alert('❌ No account found with that email address.');
+      } else {
+        alert('❌ Error sending reset email. Please try again.');
+      }
     }
   };
 
@@ -212,6 +236,12 @@ function App() {
       setIsEditing(true);
       setIsPredicting(false);
       setCurrentRound(1);
+      
+      // Load predictions count
+      const predQuery = query(collection(db, 'predictions'), where('gameId', '==', data.gameId));
+      const predSnapshot = await getDocs(predQuery);
+      setPredictionsCount(predSnapshot.docs.length);
+      
       setView('view-bracket');
       
     } catch (error) {
@@ -586,6 +616,21 @@ function App() {
                 {authView === 'login' ? '🔓 Log In' : '✨ Sign Up'}
               </button>
 
+              {authView === 'login' && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  style={{
+                    ...buttonStyle,
+                    width: '100%',
+                    backgroundColor: '#FF9800',
+                    marginBottom: '15px'
+                  }}
+                >
+                  🔑 Forgot Password?
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -876,6 +921,16 @@ function App() {
                 📋 Copy
               </button>
             </div>
+            {predictionsCount > 0 && (
+              <p style={{ 
+                color: '#2196F3', 
+                fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+                marginBottom: '10px',
+                fontWeight: 'bold'
+              }}>
+                👥 {predictionsCount} {predictionsCount === 1 ? 'person has' : 'people have'} made predictions!
+              </p>
+            )}
             <p style={{ color: '#4CAF50', marginBottom: '20px' }}>Winner: {bracket[`${maxRound}-0`] || 'Not complete'}</p>
             
             {rounds.map((round) => (
