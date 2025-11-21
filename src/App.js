@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
-import { db } from './firebase';
+import React, { useState, useEffect } from 'react';
+import { db, auth } from './firebase';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
 import './App.css';
 
 function App() {
   const [view, setView] = useState('home');
+  const [user, setUser] = useState(null);
+  const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
   const [gameId, setGameId] = useState('');
   const [loadGameId, setLoadGameId] = useState('');
   const [joinGameId, setJoinGameId] = useState('');
@@ -47,6 +58,59 @@ function App() {
 
   const rounds = getRoundsForSize(bracketSize);
   const maxRound = rounds.length;
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (!currentUser && view !== 'auth') {
+        setView('auth');
+      }
+    });
+    return () => unsubscribe();
+  }, [view]);
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      setEmail('');
+      setPassword('');
+      setView('home');
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setEmail('');
+      setPassword('');
+      setView('home');
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setView('auth');
+      // Reset all state
+      setNames(Array(32).fill(''));
+      setBracket({});
+      setCurrentRound(1);
+      setIsEditing(false);
+      setIsPredicting(false);
+      setGameId('');
+    } catch (error) {
+      alert('Error logging out');
+    }
+  };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -323,6 +387,8 @@ function App() {
         // Create new tournament
         await addDoc(collection(db, 'games'), {
           gameId: gameId,
+          userId: user?.uid || null,
+          userEmail: user?.email || null,
           names: names,
           bracket: bracket,
           bracketSize: bracketSize,
@@ -419,13 +485,112 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        {view === 'home' && (
+        {view === 'auth' && (
+          <div style={{ maxWidth: '400px', width: '100%', padding: '20px' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
+              👶 🏆 👧
+            </div>
+            <h1>Baby Name Bracket</h1>
+            <p style={{ color: '#888', marginBottom: '30px' }}>
+              {authView === 'login' ? 'Welcome back!' : 'Create your account'}
+            </p>
+
+            <form onSubmit={authView === 'login' ? handleLogin : handleSignUp} style={{ width: '100%' }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{
+                  ...inputStyle,
+                  marginBottom: '15px',
+                  width: '100%'
+                }}
+              />
+              <input
+                type="password"
+                placeholder="Password (min 6 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                style={{
+                  ...inputStyle,
+                  marginBottom: '15px',
+                  width: '100%'
+                }}
+              />
+
+              {authError && (
+                <p style={{ color: '#f44336', fontSize: '0.9rem', marginBottom: '15px' }}>
+                  {authError}
+                </p>
+              )}
+
+              <button type="submit" style={{ ...buttonStyle, width: '100%', marginBottom: '15px' }}>
+                {authView === 'login' ? '🔓 Log In' : '✨ Sign Up'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthView(authView === 'login' ? 'signup' : 'login');
+                  setAuthError('');
+                }}
+                style={{
+                  ...buttonStyle,
+                  width: '100%',
+                  backgroundColor: '#666'
+                }}
+              >
+                {authView === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Log In'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {view === 'home' && user && (
           <>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
               👶 🏆 👧
             </div>
             <h1>Baby Name Bracket</h1>
             <p>The Ultimate Name Reveal Game</p>
+            
+            {user && (
+              <div style={{ 
+                marginTop: '1rem',
+                padding: '10px 20px',
+                background: '#2d2d2d',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '10px',
+                maxWidth: '400px',
+                width: '100%'
+              }}>
+                <span style={{ color: '#888', fontSize: '0.9rem' }}>
+                  👤 {user.email}
+                </span>
+                <button 
+                  onClick={handleLogout}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.8rem',
+                    backgroundColor: '#d32f2f',
+                    border: 'none',
+                    borderRadius: '5px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
             
             <div style={{ 
               marginTop: '2rem', 
