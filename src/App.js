@@ -120,6 +120,20 @@ function App() {
     });
   };
 
+  const shuffleNames = () => {
+    const confirmed = window.confirm(
+      'Shuffle the order of names?\n\nThis will randomize the matchups to make the bracket more fair and unpredictable!'
+    );
+    if (confirmed) {
+      const shuffled = [...names];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setNames(shuffled);
+    }
+  };
+
   const selectBracketSize = (size) => {
     setBracketSize(size);
     setNames(Array(size).fill(''));
@@ -451,6 +465,46 @@ function App() {
     } catch (error) {
       console.error('Error loading predictions:', error);
       alert('Error loading predictions!');
+    }
+  };
+
+  const deleteTournament = async () => {
+    const confirmed = window.confirm(
+      `⚠️ DELETE TOURNAMENT?\n\nGame ID: ${gameId}\n\nThis will permanently delete:\n• Your bracket\n• All predictions\n• All data\n\nThis CANNOT be undone!\n\nAre you absolutely sure?`
+    );
+    
+    if (!confirmed) return;
+
+    // Double confirmation for safety
+    const doubleCheck = window.confirm(
+      '🚨 FINAL WARNING 🚨\n\nAre you REALLY sure you want to delete this tournament?\n\nClick OK to DELETE FOREVER.\nClick Cancel to keep it.'
+    );
+
+    if (!doubleCheck) return;
+
+    try {
+      // Delete the tournament
+      if (tournamentDocId) {
+        await updateDoc(doc(db, 'games', tournamentDocId), {
+          deleted: true,
+          deletedAt: new Date().toISOString()
+        });
+      }
+
+      alert('✅ Tournament deleted successfully!');
+      
+      // Reset and go home
+      setNames(Array(32).fill(''));
+      setBracket({});
+      setCurrentRound(1);
+      setIsEditing(false);
+      setTournamentDocId('');
+      setGameId('');
+      setView('home');
+      
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+      alert('❌ Error deleting tournament. Please try again.');
     }
   };
 
@@ -790,6 +844,9 @@ function App() {
               <button onClick={() => goBackWithConfirmation('home')} style={buttonStyle}>
                 ← Back
               </button>
+              <button onClick={shuffleNames} style={{...buttonStyle, backgroundColor: '#9C27B0'}}>
+                🎲 Shuffle Names
+              </button>
               <button onClick={startBracket} style={buttonStyle}>
                 Next: Create Bracket →
               </button>
@@ -863,6 +920,9 @@ function App() {
               </button>
               <button onClick={editBracket} style={{...buttonStyle, backgroundColor: '#FF9800'}}>
                 ✏️ Edit Bracket
+              </button>
+              <button onClick={deleteTournament} style={{...buttonStyle, backgroundColor: '#d32f2f'}}>
+                🗑️ Delete Tournament
               </button>
             </div>
           </div>
